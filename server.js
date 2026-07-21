@@ -6,19 +6,26 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
-// Serve all static files from this exact folder
 app.use(express.static(__dirname));
+
+// Keep track of all drawn lines so new/refreshed screens can load them
+let strokeHistory = [];
 
 io.on('connection', (socket) => {
     console.log('A user grabbed a piece of chalk.');
 
-    // Listen for drawing events and broadcast to everyone else
+    // Send existing drawing history to the newly connected user
+    socket.emit('init', strokeHistory);
+
+    // Listen for drawing events, save them, and broadcast
     socket.on('draw', (data) => {
+        strokeHistory.push(data);
         socket.broadcast.emit('draw', data);
     });
 
-    // Listen for clear signals and broadcast to everyone
+    // Clear history when cleared
     socket.on('clear', () => {
+        strokeHistory = [];
         io.emit('clear');
     });
 
@@ -27,9 +34,10 @@ io.on('connection', (socket) => {
     });
 });
 
-// Auto-reset the board every 24 hours (24 * 60 * 60 * 1000 ms)
+// Auto-reset the board every 24 hours
 const TWENTY_FOUR_HOURS = 86400000;
 setInterval(() => {
+    strokeHistory = [];
     io.emit('clear');
     console.log('Daily chalkboard reset triggered.');
 }, TWENTY_FOUR_HOURS);
