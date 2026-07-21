@@ -6,15 +6,18 @@ canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
 
 let drawing = false;
-let localHistory = []; // Keeps a local copy for window resizing
+let localHistory = [];
 let current = {
     color: 'rgba(255, 255, 255, 0.9)',
-    size: 4
+    size: 4,
+    x: 0,
+    y: 0
 };
 
 ctx.lineJoin = 'round';
 ctx.lineCap = 'round';
 
+// Handle tool selection (colors and eraser)
 document.querySelectorAll('.color-picker').forEach(picker => {
     picker.addEventListener('click', (e) => {
         current.color = e.currentTarget.getAttribute('data-color');
@@ -25,14 +28,34 @@ document.querySelectorAll('.color-picker').forEach(picker => {
     });
 });
 
-// Draws using mathematical fractions so it fits PC and Mobile equally
+// Calculates coordinates relative to the absolute center of the screen
+const getCenterCoords = (e) => {
+    let clientX, clientY;
+    if (e.touches && e.touches.length > 0) {
+        clientX = e.touches[0].clientX;
+        clientY = e.touches[0].clientY;
+    } else if (e.changedTouches && e.changedTouches.length > 0) {
+        clientX = e.changedTouches[0].clientX;
+        clientY = e.changedTouches[0].clientY;
+    } else {
+        clientX = e.clientX;
+        clientY = e.clientY;
+    }
+    
+    return {
+        x: clientX - (window.innerWidth / 2),
+        y: clientY - (window.innerHeight / 2)
+    };
+};
+
 const drawLine = (x0, y0, x1, y1, color, size, emit) => {
-    const w = canvas.width;
-    const h = canvas.height;
+    const cx = window.innerWidth / 2;
+    const cy = window.innerHeight / 2;
 
     ctx.beginPath();
-    ctx.moveTo(x0 * w, y0 * h);
-    ctx.lineTo(x1 * w, y1 * h);
+    // Add the screen's center point back to draw at the correct local pixel
+    ctx.moveTo(x0 + cx, y0 + cy);
+    ctx.lineTo(x1 + cx, y1 + cy);
     ctx.strokeStyle = color;
     ctx.lineWidth = size;
     ctx.stroke();
@@ -47,25 +70,24 @@ const drawLine = (x0, y0, x1, y1, color, size, emit) => {
 
 const onPointerDown = (e) => {
     drawing = true;
-    current.x = (e.clientX || e.touches[0].clientX) / canvas.width;
-    current.y = (e.clientY || e.touches[0].clientY) / canvas.height;
+    const coords = getCenterCoords(e);
+    current.x = coords.x;
+    current.y = coords.y;
 };
 
 const onPointerUp = (e) => {
     if (!drawing) return;
     drawing = false;
-    const x = (e.clientX || e.changedTouches[0].clientX) / canvas.width;
-    const y = (e.clientY || e.changedTouches[0].clientY) / canvas.height;
-    drawLine(current.x, current.y, x, y, current.color, current.size, true);
+    const coords = getCenterCoords(e);
+    drawLine(current.x, current.y, coords.x, coords.y, current.color, current.size, true);
 };
 
 const onPointerMove = (e) => {
     if (!drawing) return;
-    const x = (e.clientX || e.touches[0].clientX) / canvas.width;
-    const y = (e.clientY || e.touches[0].clientY) / canvas.height;
-    drawLine(current.x, current.y, x, y, current.color, current.size, true);
-    current.x = x;
-    current.y = y;
+    const coords = getCenterCoords(e);
+    drawLine(current.x, current.y, coords.x, coords.y, current.color, current.size, true);
+    current.x = coords.x;
+    current.y = coords.y;
 };
 
 canvas.addEventListener('mousedown', onPointerDown);
@@ -73,6 +95,7 @@ canvas.addEventListener('mouseup', onPointerUp);
 canvas.addEventListener('mouseout', onPointerUp);
 canvas.addEventListener('mousemove', onPointerMove);
 
+// Mobile touch listeners
 canvas.addEventListener('touchstart', onPointerDown, { passive: false });
 canvas.addEventListener('touchend', onPointerUp, { passive: false });
 canvas.addEventListener('touchcancel', onPointerUp, { passive: false });
@@ -108,6 +131,7 @@ window.addEventListener('resize', () => {
     ctx.lineJoin = 'round';
     ctx.lineCap = 'round';
     
+    // Redraw everything perfectly anchored to the new center
     localHistory.forEach(data => {
         drawLine(data.x0, data.y0, data.x1, data.y1, data.color, data.size, false);
     });
