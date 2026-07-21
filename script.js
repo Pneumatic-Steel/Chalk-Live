@@ -1,6 +1,7 @@
 const socket = io({
     transports: ['websocket']
 });
+
 const canvas = document.getElementById('chalkboard');
 const ctx = canvas.getContext('2d');
 
@@ -71,6 +72,13 @@ canvas.addEventListener('touchstart', onPointerDown, { passive: false });
 canvas.addEventListener('touchend', onPointerUp, { passive: false });
 canvas.addEventListener('touchcancel', onPointerUp, { passive: false });
 canvas.addEventListener('touchmove', onPointerMove, { passive: false });
+
+// Load existing strokes when first joining or refreshing
+socket.on('init', (history) => {
+    history.forEach(data => {
+        drawLine(data.x0, data.y0, data.x1, data.y1, data.color, data.size, false);
+    });
+});
 
 socket.on('draw', (data) => {
     drawLine(data.x0, data.y0, data.x1, data.y1, data.color, data.size, false);
