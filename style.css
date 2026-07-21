@@ -20,6 +20,7 @@ body, html {
     background: rgba(0, 0, 0, 0.3);
     padding: 10px;
     border-radius: 8px;
+    z-index: 10;
 }
 
 .color-picker {
@@ -45,4 +46,23 @@ body, html {
 
 .eraser {
     background: #444;
+}
+
+/* Styles the player counter */
+#counter {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: rgba(0, 0, 0, 0.3);
+    color: white;
+    padding: 10px 15px;
+    border-radius: 8px;
+    font-family: sans-serif;
+    font-size: 18px;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    z-index: 10;
+    user-select: none;
 }
