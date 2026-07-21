@@ -1,4 +1,6 @@
-const socket = io();
+const socket = io({
+    transports: ['websocket']
+});
 const canvas = document.getElementById('chalkboard');
 const ctx = canvas.getContext('2d');
 
