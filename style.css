@@ -1,0 +1,48 @@
+body, html {
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    background-color: #2a3631;
+    touch-action: none;
+}
+
+#chalkboard {
+    cursor: crosshair;
+    display: block;
+}
+
+#toolbar {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    display: flex;
+    gap: 10px;
+    background: rgba(0, 0, 0, 0.3);
+    padding: 10px;
+    border-radius: 8px;
+}
+
+.color-picker {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    cursor: pointer;
+    border: 2px solid transparent;
+    transition: transform 0.1s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+}
+
+.color-picker:hover {
+    transform: scale(1.2);
+}
+
+.color-picker.active {
+    border-color: white;
+}
+
+.eraser {
+    background: #444;
+}
