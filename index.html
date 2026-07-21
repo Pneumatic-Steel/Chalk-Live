@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Digital Chalkboard</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="toolbar">
+        <div class="color-picker active" style="background: rgba(255, 255, 255, 0.9);" data-color="rgba(255, 255, 255, 0.9)" data-size="4"></div>
+        <div class="color-picker" style="background: rgba(255, 255, 100, 0.9);" data-color="rgba(255, 255, 100, 0.9)" data-size="4"></div>
+        <div class="color-picker" style="background: rgba(255, 100, 150, 0.9);" data-color="rgba(255, 100, 150, 0.9)" data-size="4"></div>
+        <div class="color-picker" style="background: rgba(100, 200, 255, 0.9);" data-color="rgba(100, 200, 255, 0.9)" data-size="4"></div>
+        <div class="color-picker" style="background: rgba(100, 255, 100, 0.9);" data-color="rgba(100, 255, 100, 0.9)" data-size="4"></div>
+        <div class="color-picker eraser" id="eraser-btn" data-color="#2a3631" data-size="24" title="Eraser">🧹</div>
+    </div>
+    <canvas id="chalkboard"></canvas>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>
