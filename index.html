@@ -2,7 +2,8 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- Prevents mobile screens from accidentally zooming while drawing -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Digital Chalkboard</title>
     <link rel="stylesheet" href="style.css">
 </head>
@@ -15,6 +16,10 @@
         <div class="color-picker" style="background: rgba(100, 255, 100, 0.9);" data-color="rgba(100, 255, 100, 0.9)" data-size="4"></div>
         <div class="color-picker eraser" id="eraser-btn" data-color="#2a3631" data-size="24" title="Eraser">🧹</div>
     </div>
+
+    <!-- The live player counter -->
+    <div id="counter">👤 <span id="user-count">1</span></div>
+
     <canvas id="chalkboard"></canvas>
 
     <script src="/socket.io/socket.io.js"></script>
