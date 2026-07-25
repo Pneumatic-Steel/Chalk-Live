@@ -24,7 +24,7 @@ const brushSize = document.getElementById('brush-size');
 const eraserBtn = document.getElementById('eraser-btn');
 const effectPicker = document.getElementById('brush-effect');
 
-// Intercept standard color picking to turn off effects
+// Turn off effects if a standard color is picked
 colorPicker.addEventListener('input', (e) => {
     isErasing = false;
     eraserBtn.classList.remove('active');
@@ -37,13 +37,14 @@ brushSize.addEventListener('input', (e) => {
     current.size = parseInt(e.target.value);
 });
 
-// Listen for effect dropdown changes
+// Turn off eraser if an effect is picked
 effectPicker.addEventListener('change', (e) => {
     isErasing = false;
     eraserBtn.classList.remove('active');
     current.effect = e.target.value;
 });
 
+// Turn off effects if erasing
 eraserBtn.addEventListener('click', () => {
     isErasing = true;
     eraserBtn.classList.add('active');
@@ -68,52 +69,13 @@ const getCenterCoords = (e) => {
     };
 };
 
-const drawLine = (x0, y0, x1, y1, color, size, effect, emit) => {
-    const cx = window.innerWidth / 2;
-    const cy = window.innerHeight / 2;
-
-    ctx.beginPath();
-    ctx.moveTo(x0 + cx, y0 + cy);
-    ctx.lineTo(x1 + cx, y1 + cy);
-    ctx.lineWidth = size;
-    
-    // Default resets for standard solid lines
-    ctx.shadowBlur = 0;
-    ctx.shadowColor = 'transparent';
-    ctx.strokeStyle = color;
-
-    // Apply the math magic if an effect is selected
-    if (effect !== 'none' && color !== '#2a3631') {
-        // Generates a fixed pseudo-random number based on the coordinates 
-        // so it redraws perfectly identical during window resizing
-        const seed = Math.abs(Math.sin(x0 + y0)) * 100;
-        
-        if (effect === 'rainbow') {
-            const hue = (Math.abs(x0 + y0) / 2) % 360;
-            ctx.strokeStyle = `hsl(${hue}, 100%, 60%)`;
-        } else if (effect === 'fire') {
-            ctx.strokeStyle = seed > 50 ? '#ffaa00' : '#ff2200';
-            ctx.shadowBlur = size * 2;
-            ctx.shadowColor = '#ff0000';
-        } else if (effect === 'mystic') {
-            ctx.strokeStyle = seed > 50 ? '#00ffff' : '#ff00ff';
-            ctx.shadowBlur = size * 2.5;
-            ctx.shadowColor = '#8a2be2';
-        } else if (effect === 'galaxy') {
-            ctx.strokeStyle = seed > 92 ? '#ffffff' : '#4b0082';
-            ctx.shadowBlur = size * 2;
-            ctx.shadowColor = '#ff00ff';
-        }
-    }
-
-    ctx.stroke();
-    ctx.closePath();
-
-    if (!emit) return;
-    
+// Packages the coordinate data and sends it out, but no longer paints directly!
+const recordLine = (x0, y0, x1, y1, color, size, effect, emit) => {
     const strokeData = { x0, y0, x1, y1, color, size, effect };
-    localHistory.push(strokeData);
-    socket.emit('draw', strokeData);
+    if (emit) {
+        localHistory.push(strokeData);
+        socket.emit('draw', strokeData);
+    }
 };
 
 const onPointerDown = (e) => {
@@ -129,7 +91,7 @@ const onPointerUp = (e) => {
     const coords = getCenterCoords(e);
     const activeColor = isErasing ? '#2a3631' : current.color;
     const activeEffect = isErasing ? 'none' : current.effect;
-    drawLine(current.x, current.y, coords.x, coords.y, activeColor, current.size, activeEffect, true);
+    recordLine(current.x, current.y, coords.x, coords.y, activeColor, current.size, activeEffect, true);
 };
 
 const onPointerMove = (e) => {
@@ -137,7 +99,7 @@ const onPointerMove = (e) => {
     const coords = getCenterCoords(e);
     const activeColor = isErasing ? '#2a3631' : current.color;
     const activeEffect = isErasing ? 'none' : current.effect;
-    drawLine(current.x, current.y, coords.x, coords.y, activeColor, current.size, activeEffect, true);
+    recordLine(current.x, current.y, coords.x, coords.y, activeColor, current.size, activeEffect, true);
     current.x = coords.x;
     current.y = coords.y;
 };
@@ -154,22 +116,14 @@ canvas.addEventListener('touchmove', onPointerMove, { passive: false });
 
 socket.on('init', (history) => {
     localHistory = history;
-    history.forEach(data => {
-        // Fallback to 'none' for old lines that were saved before we added the effect code
-        const eff = data.effect || 'none';
-        drawLine(data.x0, data.y0, data.x1, data.y1, data.color, data.size, eff, false);
-    });
 });
 
 socket.on('draw', (data) => {
     localHistory.push(data);
-    const eff = data.effect || 'none';
-    drawLine(data.x0, data.y0, data.x1, data.y1, data.color, data.size, eff, false);
 });
 
 socket.on('clear', () => {
     localHistory = [];
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
 });
 
 const userCountDisplay = document.getElementById('user-count');
@@ -182,9 +136,69 @@ window.addEventListener('resize', () => {
     canvas.height = window.innerHeight;
     ctx.lineJoin = 'round';
     ctx.lineCap = 'round';
-    
-    localHistory.forEach(data => {
-        const eff = data.effect || 'none';
-        drawLine(data.x0, data.y0, data.x1, data.y1, data.color, data.size, eff, false);
-    });
 });
+
+
+// --------------------------------------------------
+// THE 60-FPS RENDER ENGINE LOOP
+// --------------------------------------------------
+let time = 0;
+
+function renderCanvas() {
+    // 1. Wipe the board entirely
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    // 2. Advance the animation clock
+    time += 1; 
+    
+    const cx = window.innerWidth / 2;
+    const cy = window.innerHeight / 2;
+
+    // 3. Redraw every single stroke ever made
+    localHistory.forEach(data => {
+        const effect = data.effect || 'none';
+        
+        ctx.beginPath();
+        ctx.moveTo(data.x0 + cx, data.y0 + cy);
+        ctx.lineTo(data.x1 + cx, data.y1 + cy);
+        ctx.lineWidth = data.size;
+        
+        ctx.shadowBlur = 0;
+        ctx.shadowColor = 'transparent';
+        ctx.strokeStyle = data.color;
+
+        // 4. Inject the time variable into the math for the magic
+        if (effect !== 'none' && data.color !== '#2a3631') {
+            const pos = data.x0 + data.y0;
+            
+            if (effect === 'rainbow') {
+                const hue = (Math.abs(pos / 2) - (time * 5)) % 360; 
+                ctx.strokeStyle = `hsl(${hue < 0 ? hue + 360 : hue}, 100%, 60%)`;
+            } else if (effect === 'fire') {
+                const flicker = Math.abs(Math.sin((pos * 0.05) - (time * 0.2))) * 100;
+                ctx.strokeStyle = flicker > 50 ? '#ffaa00' : '#ff2200';
+                ctx.shadowBlur = data.size * 2;
+                ctx.shadowColor = '#ff0000';
+            } else if (effect === 'mystic') {
+                const pulse = Math.abs(Math.cos((pos * 0.02) + (time * 0.1))) * 100;
+                ctx.strokeStyle = pulse > 50 ? '#00ffff' : '#ff00ff';
+                ctx.shadowBlur = data.size * 2.5;
+                ctx.shadowColor = '#8a2be2';
+            } else if (effect === 'galaxy') {
+                const twinkle = Math.abs(Math.sin((data.x0 * data.y0) * 0.005 + (time * 0.3))) * 100;
+                ctx.strokeStyle = twinkle > 90 ? '#ffffff' : '#4b0082';
+                ctx.shadowBlur = twinkle > 90 ? data.size * 2 : 0;
+                ctx.shadowColor = '#ff00ff';
+            }
+        }
+
+        ctx.stroke();
+        ctx.closePath();
+    });
+
+    // 5. Request the next frame to keep it looping forever
+    requestAnimationFrame(renderCanvas);
+}
+
+// Start the engine
+renderCanvas();
