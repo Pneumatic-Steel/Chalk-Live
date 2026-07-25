@@ -16,39 +16,74 @@ body, html {
     top: 10px;
     left: 10px;
     display: flex;
-    gap: 10px;
-    background: rgba(0, 0, 0, 0.3);
-    padding: 10px;
+    align-items: center;
+    gap: 15px;
+    background: rgba(0, 0, 0, 0.4);
+    padding: 10px 15px;
     border-radius: 8px;
     z-index: 10;
 }
 
-.color-picker {
-    width: 30px;
-    height: 30px;
+/* Customizing the native color picker wheel */
+#color-picker {
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    width: 35px;
+    height: 35px;
+    border: 2px solid transparent;
     border-radius: 50%;
     cursor: pointer;
-    border: 2px solid transparent;
+    background: transparent;
+    padding: 0;
     transition: transform 0.1s;
+}
+
+#color-picker:hover {
+    transform: scale(1.1);
+}
+
+#color-picker::-webkit-color-swatch {
+    border-radius: 50%;
+    border: 2px solid white;
+}
+
+#color-picker::-moz-color-swatch {
+    border-radius: 50%;
+    border: 2px solid white;
+}
+
+/* Styling the size slider */
+#brush-size {
+    cursor: pointer;
+    width: 100px;
+}
+
+/* Updated styling for the eraser button */
+.tool-btn {
+    width: 35px;
+    height: 35px;
+    border-radius: 50%;
+    cursor: pointer;
+    background: #444;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 14px;
+    font-size: 16px;
+    border: 2px solid transparent;
+    transition: transform 0.1s;
+    user-select: none;
 }
 
-.color-picker:hover {
-    transform: scale(1.2);
+.tool-btn:hover {
+    transform: scale(1.1);
 }
 
-.color-picker.active {
+.tool-btn.active {
     border-color: white;
+    background: #666;
 }
 
-.eraser {
-    background: #444;
-}
-
-/* Styles the player counter */
 #counter {
     position: absolute;
     top: 10px;
