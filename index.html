@@ -2,24 +2,23 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <!-- Prevents mobile screens from accidentally zooming while drawing -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Digital Chalkboard</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <div id="toolbar">
-        <div class="color-picker active" style="background: rgba(255, 255, 255, 0.9);" data-color="rgba(255, 255, 255, 0.9)" data-size="4"></div>
-        <div class="color-picker" style="background: rgba(255, 255, 100, 0.9);" data-color="rgba(255, 255, 100, 0.9)" data-size="4"></div>
-        <div class="color-picker" style="background: rgba(255, 100, 150, 0.9);" data-color="rgba(255, 100, 150, 0.9)" data-size="4"></div>
-        <div class="color-picker" style="background: rgba(100, 200, 255, 0.9);" data-color="rgba(100, 200, 255, 0.9)" data-size="4"></div>
-        <div class="color-picker" style="background: rgba(100, 255, 100, 0.9);" data-color="rgba(100, 255, 100, 0.9)" data-size="4"></div>
-        <div class="color-picker eraser" id="eraser-btn" data-color="#2a3631" data-size="24" title="Eraser">🧹</div>
+        <!-- Native color picker -->
+        <input type="color" id="color-picker" value="#ffffff" title="Choose Color">
+        
+        <!-- Brush size slider -->
+        <input type="range" id="brush-size" min="1" max="50" value="4" title="Brush Size">
+        
+        <!-- Eraser button -->
+        <div class="tool-btn" id="eraser-btn" title="Eraser">🧹</div>
     </div>
 
-    <!-- The live player counter -->
     <div id="counter">👤 <span id="user-count">1</span></div>
-
     <canvas id="chalkboard"></canvas>
 
     <script src="/socket.io/socket.io.js"></script>
