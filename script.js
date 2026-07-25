@@ -11,6 +11,7 @@ let isErasing = false;
 let current = {
     color: '#ffffff',
     size: 4,
+    effect: 'none',
     x: 0,
     y: 0
 };
@@ -18,24 +19,31 @@ let current = {
 ctx.lineJoin = 'round';
 ctx.lineCap = 'round';
 
-// Get references to our new HTML inputs
 const colorPicker = document.getElementById('color-picker');
 const brushSize = document.getElementById('brush-size');
 const eraserBtn = document.getElementById('eraser-btn');
+const effectPicker = document.getElementById('brush-effect');
 
-// Listen for color changes
+// Intercept standard color picking to turn off effects
 colorPicker.addEventListener('input', (e) => {
     isErasing = false;
     eraserBtn.classList.remove('active');
     current.color = e.target.value;
+    current.effect = 'none';
+    effectPicker.value = 'none';
 });
 
-// Listen for brush size slider changes
 brushSize.addEventListener('input', (e) => {
     current.size = parseInt(e.target.value);
 });
 
-// Handle Eraser Toggle
+// Listen for effect dropdown changes
+effectPicker.addEventListener('change', (e) => {
+    isErasing = false;
+    eraserBtn.classList.remove('active');
+    current.effect = e.target.value;
+});
+
 eraserBtn.addEventListener('click', () => {
     isErasing = true;
     eraserBtn.classList.add('active');
@@ -60,21 +68,50 @@ const getCenterCoords = (e) => {
     };
 };
 
-const drawLine = (x0, y0, x1, y1, color, size, emit) => {
+const drawLine = (x0, y0, x1, y1, color, size, effect, emit) => {
     const cx = window.innerWidth / 2;
     const cy = window.innerHeight / 2;
 
     ctx.beginPath();
     ctx.moveTo(x0 + cx, y0 + cy);
     ctx.lineTo(x1 + cx, y1 + cy);
-    ctx.strokeStyle = color;
     ctx.lineWidth = size;
+    
+    // Default resets for standard solid lines
+    ctx.shadowBlur = 0;
+    ctx.shadowColor = 'transparent';
+    ctx.strokeStyle = color;
+
+    // Apply the math magic if an effect is selected
+    if (effect !== 'none' && color !== '#2a3631') {
+        // Generates a fixed pseudo-random number based on the coordinates 
+        // so it redraws perfectly identical during window resizing
+        const seed = Math.abs(Math.sin(x0 + y0)) * 100;
+        
+        if (effect === 'rainbow') {
+            const hue = (Math.abs(x0 + y0) / 2) % 360;
+            ctx.strokeStyle = `hsl(${hue}, 100%, 60%)`;
+        } else if (effect === 'fire') {
+            ctx.strokeStyle = seed > 50 ? '#ffaa00' : '#ff2200';
+            ctx.shadowBlur = size * 2;
+            ctx.shadowColor = '#ff0000';
+        } else if (effect === 'mystic') {
+            ctx.strokeStyle = seed > 50 ? '#00ffff' : '#ff00ff';
+            ctx.shadowBlur = size * 2.5;
+            ctx.shadowColor = '#8a2be2';
+        } else if (effect === 'galaxy') {
+            ctx.strokeStyle = seed > 92 ? '#ffffff' : '#4b0082';
+            ctx.shadowBlur = size * 2;
+            ctx.shadowColor = '#ff00ff';
+        }
+    }
+
     ctx.stroke();
     ctx.closePath();
 
     if (!emit) return;
     
-    const strokeData = { x0, y0, x1, y1, color, size };
+    const strokeData = { x0, y0, x1, y1, color, size, effect };
     localHistory.push(strokeData);
     socket.emit('draw', strokeData);
 };
@@ -90,16 +127,17 @@ const onPointerUp = (e) => {
     if (!drawing) return;
     drawing = false;
     const coords = getCenterCoords(e);
-    // Determine color: Background green if erasing, picker hex if drawing
     const activeColor = isErasing ? '#2a3631' : current.color;
-    drawLine(current.x, current.y, coords.x, coords.y, activeColor, current.size, true);
+    const activeEffect = isErasing ? 'none' : current.effect;
+    drawLine(current.x, current.y, coords.x, coords.y, activeColor, current.size, activeEffect, true);
 };
 
 const onPointerMove = (e) => {
     if (!drawing) return;
     const coords = getCenterCoords(e);
     const activeColor = isErasing ? '#2a3631' : current.color;
-    drawLine(current.x, current.y, coords.x, coords.y, activeColor, current.size, true);
+    const activeEffect = isErasing ? 'none' : current.effect;
+    drawLine(current.x, current.y, coords.x, coords.y, activeColor, current.size, activeEffect, true);
     current.x = coords.x;
     current.y = coords.y;
 };
@@ -117,13 +155,16 @@ canvas.addEventListener('touchmove', onPointerMove, { passive: false });
 socket.on('init', (history) => {
     localHistory = history;
     history.forEach(data => {
-        drawLine(data.x0, data.y0, data.x1, data.y1, data.color, data.size, false);
+        // Fallback to 'none' for old lines that were saved before we added the effect code
+        const eff = data.effect || 'none';
+        drawLine(data.x0, data.y0, data.x1, data.y1, data.color, data.size, eff, false);
     });
 });
 
 socket.on('draw', (data) => {
     localHistory.push(data);
-    drawLine(data.x0, data.y0, data.x1, data.y1, data.color, data.size, false);
+    const eff = data.effect || 'none';
+    drawLine(data.x0, data.y0, data.x1, data.y1, data.color, data.size, eff, false);
 });
 
 socket.on('clear', () => {
@@ -143,6 +184,7 @@ window.addEventListener('resize', () => {
     ctx.lineCap = 'round';
     
     localHistory.forEach(data => {
-        drawLine(data.x0, data.y0, data.x1, data.y1, data.color, data.size, false);
+        const eff = data.effect || 'none';
+        drawLine(data.x0, data.y0, data.x1, data.y1, data.color, data.size, eff, false);
     });
 });
