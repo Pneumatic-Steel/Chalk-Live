@@ -8,13 +8,18 @@
 </head>
 <body>
     <div id="toolbar">
-        <!-- Native color picker -->
         <input type="color" id="color-picker" value="#ffffff" title="Choose Color">
-        
-        <!-- Brush size slider -->
         <input type="range" id="brush-size" min="1" max="50" value="4" title="Brush Size">
         
-        <!-- Eraser button -->
+        <!-- The new effect dropdown -->
+        <select id="brush-effect" title="Brush Effect">
+            <option value="none">Solid Color</option>
+            <option value="rainbow">🌈 Rainbow</option>
+            <option value="fire">🔥 Fire</option>
+            <option value="mystic">🔮 Mystic</option>
+            <option value="galaxy">🌌 Galaxy</option>
+        </select>
+        
         <div class="tool-btn" id="eraser-btn" title="Eraser">🧹</div>
     </div>
 
