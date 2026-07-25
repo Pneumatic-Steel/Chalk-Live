@@ -16,6 +16,8 @@ body, html {
     top: 10px;
     left: 10px;
     display: flex;
+    flex-wrap: wrap; /* Allows tools to drop to a second line if they run out of room */
+    max-width: calc(100% - 100px); /* Leaves a safe space for the counter on PC */
     align-items: center;
     gap: 15px;
     background: rgba(0, 0, 0, 0.4);
@@ -59,7 +61,7 @@ body, html {
     width: 100px;
 }
 
-/* Styling for the eraser button */
+/* Styling for the tool buttons */
 .tool-btn {
     width: 35px;
     height: 35px;
@@ -120,4 +122,22 @@ body, html {
 #brush-effect:hover {
     border-color: white;
     transform: scale(1.05);
+}
+
+/* --- MOBILE SPECIFIC RULES --- */
+@media (max-width: 700px) {
+    #counter {
+        top: auto;
+        bottom: 20px; /* Drops the counter to the bottom right on phones */
+        right: 15px;
+    }
+    
+    #toolbar {
+        max-width: calc(100% - 40px); /* Gives the toolbar the full top of the screen */
+        gap: 10px; /* Shrinks the space between tools slightly */
+    }
+    
+    #brush-size {
+        width: 70px; /* Makes the slider slightly shorter to fit better */
+    }
 }
