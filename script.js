@@ -7,8 +7,9 @@ canvas.height = window.innerHeight;
 
 let drawing = false;
 let localHistory = [];
+let isErasing = false;
 let current = {
-    color: 'rgba(255, 255, 255, 0.9)',
+    color: '#ffffff',
     size: 4,
     x: 0,
     y: 0
@@ -17,18 +18,29 @@ let current = {
 ctx.lineJoin = 'round';
 ctx.lineCap = 'round';
 
-// Handle tool selection (colors and eraser)
-document.querySelectorAll('.color-picker').forEach(picker => {
-    picker.addEventListener('click', (e) => {
-        current.color = e.currentTarget.getAttribute('data-color');
-        current.size = parseInt(e.currentTarget.getAttribute('data-size'));
-        
-        document.querySelectorAll('.color-picker').forEach(p => p.classList.remove('active'));
-        e.currentTarget.classList.add('active');
-    });
+// Get references to our new HTML inputs
+const colorPicker = document.getElementById('color-picker');
+const brushSize = document.getElementById('brush-size');
+const eraserBtn = document.getElementById('eraser-btn');
+
+// Listen for color changes
+colorPicker.addEventListener('input', (e) => {
+    isErasing = false;
+    eraserBtn.classList.remove('active');
+    current.color = e.target.value;
 });
 
-// Calculates coordinates relative to the absolute center of the screen
+// Listen for brush size slider changes
+brushSize.addEventListener('input', (e) => {
+    current.size = parseInt(e.target.value);
+});
+
+// Handle Eraser Toggle
+eraserBtn.addEventListener('click', () => {
+    isErasing = true;
+    eraserBtn.classList.add('active');
+});
+
 const getCenterCoords = (e) => {
     let clientX, clientY;
     if (e.touches && e.touches.length > 0) {
@@ -53,7 +65,6 @@ const drawLine = (x0, y0, x1, y1, color, size, emit) => {
     const cy = window.innerHeight / 2;
 
     ctx.beginPath();
-    // Add the screen's center point back to draw at the correct local pixel
     ctx.moveTo(x0 + cx, y0 + cy);
     ctx.lineTo(x1 + cx, y1 + cy);
     ctx.strokeStyle = color;
@@ -79,13 +90,16 @@ const onPointerUp = (e) => {
     if (!drawing) return;
     drawing = false;
     const coords = getCenterCoords(e);
-    drawLine(current.x, current.y, coords.x, coords.y, current.color, current.size, true);
+    // Determine color: Background green if erasing, picker hex if drawing
+    const activeColor = isErasing ? '#2a3631' : current.color;
+    drawLine(current.x, current.y, coords.x, coords.y, activeColor, current.size, true);
 };
 
 const onPointerMove = (e) => {
     if (!drawing) return;
     const coords = getCenterCoords(e);
-    drawLine(current.x, current.y, coords.x, coords.y, current.color, current.size, true);
+    const activeColor = isErasing ? '#2a3631' : current.color;
+    drawLine(current.x, current.y, coords.x, coords.y, activeColor, current.size, true);
     current.x = coords.x;
     current.y = coords.y;
 };
@@ -95,7 +109,6 @@ canvas.addEventListener('mouseup', onPointerUp);
 canvas.addEventListener('mouseout', onPointerUp);
 canvas.addEventListener('mousemove', onPointerMove);
 
-// Mobile touch listeners
 canvas.addEventListener('touchstart', onPointerDown, { passive: false });
 canvas.addEventListener('touchend', onPointerUp, { passive: false });
 canvas.addEventListener('touchcancel', onPointerUp, { passive: false });
@@ -118,20 +131,17 @@ socket.on('clear', () => {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 });
 
-// Listens for the player count updates and changes the HTML number
 const userCountDisplay = document.getElementById('user-count');
 socket.on('userCount', (count) => {
     userCountDisplay.innerText = count;
 });
 
-// Perfect scaling if a phone rotates or a window is resized
 window.addEventListener('resize', () => {
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
     ctx.lineJoin = 'round';
     ctx.lineCap = 'round';
     
-    // Redraw everything perfectly anchored to the new center
     localHistory.forEach(data => {
         drawLine(data.x0, data.y0, data.x1, data.y1, data.color, data.size, false);
     });
