@@ -23,8 +23,8 @@ const colorPicker = document.getElementById('color-picker');
 const brushSize = document.getElementById('brush-size');
 const eraserBtn = document.getElementById('eraser-btn');
 const effectPicker = document.getElementById('brush-effect');
+const clearBtn = document.getElementById('clear-btn'); // Grab the new button
 
-// Turn off effects if a standard color is picked
 colorPicker.addEventListener('input', (e) => {
     isErasing = false;
     eraserBtn.classList.remove('active');
@@ -37,17 +37,22 @@ brushSize.addEventListener('input', (e) => {
     current.size = parseInt(e.target.value);
 });
 
-// Turn off eraser if an effect is picked
 effectPicker.addEventListener('change', (e) => {
     isErasing = false;
     eraserBtn.classList.remove('active');
     current.effect = e.target.value;
 });
 
-// Turn off effects if erasing
 eraserBtn.addEventListener('click', () => {
     isErasing = true;
     eraserBtn.classList.add('active');
+});
+
+// The new Clear All logic
+clearBtn.addEventListener('click', () => {
+    if (confirm("Are you sure you want to wipe the board for everyone?")) {
+        socket.emit('clear'); // Tells the server to wipe it
+    }
 });
 
 const getCenterCoords = (e) => {
@@ -69,7 +74,6 @@ const getCenterCoords = (e) => {
     };
 };
 
-// Packages the coordinate data and sends it out, but no longer paints directly!
 const recordLine = (x0, y0, x1, y1, color, size, effect, emit) => {
     const strokeData = { x0, y0, x1, y1, color, size, effect };
     if (emit) {
@@ -123,7 +127,7 @@ socket.on('draw', (data) => {
 });
 
 socket.on('clear', () => {
-    localHistory = [];
+    localHistory = []; // Empties the array, immediately wiping the 60FPS render loop
 });
 
 const userCountDisplay = document.getElementById('user-count');
@@ -138,23 +142,15 @@ window.addEventListener('resize', () => {
     ctx.lineCap = 'round';
 });
 
-
-// --------------------------------------------------
-// THE 60-FPS RENDER ENGINE LOOP
-// --------------------------------------------------
 let time = 0;
 
 function renderCanvas() {
-    // 1. Wipe the board entirely
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    
-    // 2. Advance the animation clock
     time += 1; 
     
     const cx = window.innerWidth / 2;
     const cy = window.innerHeight / 2;
 
-    // 3. Redraw every single stroke ever made
     localHistory.forEach(data => {
         const effect = data.effect || 'none';
         
@@ -167,7 +163,6 @@ function renderCanvas() {
         ctx.shadowColor = 'transparent';
         ctx.strokeStyle = data.color;
 
-        // 4. Inject the time variable into the math for the magic
         if (effect !== 'none' && data.color !== '#2a3631') {
             const pos = data.x0 + data.y0;
             
@@ -196,9 +191,7 @@ function renderCanvas() {
         ctx.closePath();
     });
 
-    // 5. Request the next frame to keep it looping forever
     requestAnimationFrame(renderCanvas);
 }
 
-// Start the engine
 renderCanvas();
