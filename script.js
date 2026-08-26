@@ -10,7 +10,11 @@ let localHistory = [];
 let isErasing = false;
 let isStamping = false; 
 let currentEmojiText = '😀'; 
-let draggingSticker = null; // New tracker for the drag-to-size preview
+
+// New trackers for the active bounding box
+let activeSticker = null; 
+let interactionMode = 'none'; // 'moving', 'scaling', or 'none'
+
 let current = {
     color: '#ffffff',
     size: 4,
@@ -31,7 +35,17 @@ const emojiBtn = document.getElementById('emoji-btn');
 const emojiLibrary = document.getElementById('emoji-library');
 const emojis = emojiLibrary.querySelectorAll('span');
 
+// Locks in the sticker if you change tools
+function finalizeSticker() {
+    if (activeSticker) {
+        recordStamp(activeSticker.x, activeSticker.y, activeSticker.text, activeSticker.size, activeSticker.angle, true);
+        activeSticker = null;
+        interactionMode = 'none';
+    }
+}
+
 colorPicker.addEventListener('input', (e) => {
+    finalizeSticker();
     isErasing = false;
     isStamping = false;
     eraserBtn.classList.remove('active');
@@ -47,6 +61,7 @@ brushSize.addEventListener('input', (e) => {
 });
 
 effectPicker.addEventListener('change', (e) => {
+    finalizeSticker();
     isErasing = false;
     isStamping = false;
     eraserBtn.classList.remove('active');
@@ -56,6 +71,7 @@ effectPicker.addEventListener('change', (e) => {
 });
 
 eraserBtn.addEventListener('click', () => {
+    finalizeSticker();
     isErasing = true;
     isStamping = false;
     eraserBtn.classList.add('active');
@@ -64,6 +80,7 @@ eraserBtn.addEventListener('click', () => {
 });
 
 emojiBtn.addEventListener('click', () => {
+    finalizeSticker();
     emojiLibrary.classList.toggle('show');
     if (emojiLibrary.classList.contains('show')) {
         isStamping = true;
@@ -85,6 +102,7 @@ emojis.forEach(emojiSpan => {
 });
 
 clearBtn.addEventListener('click', () => {
+    finalizeSticker();
     if (confirm("Are you sure you want to wipe the board for everyone?")) {
         socket.emit('clear');
     }
@@ -117,8 +135,8 @@ const recordLine = (x0, y0, x1, y1, color, size, effect, emit) => {
     }
 };
 
-const recordStamp = (x, y, text, size, emit) => {
-    const stampData = { type: 'emoji', x, y, text, size };
+const recordStamp = (x, y, text, size, angle, emit) => {
+    const stampData = { type: 'emoji', x, y, text, size, angle };
     if (emit) {
         localHistory.push(stampData);
         socket.emit('draw', stampData);
@@ -126,20 +144,49 @@ const recordStamp = (x, y, text, size, emit) => {
 };
 
 const onPointerDown = (e) => {
-    // Prevents drawing if you are just clicking the toolbar or emoji menu
     if (e.target.closest('#toolbar') || e.target.closest('#emoji-library')) return; 
 
     emojiLibrary.classList.remove('show');
     const coords = getCenterCoords(e);
     
+    if (activeSticker) {
+        // Un-rotate the click coordinates to accurately check the bounding box hitboxes
+        const dx = coords.x - activeSticker.x;
+        const dy = coords.y - activeSticker.y;
+        const unX = dx * Math.cos(-activeSticker.angle) - dy * Math.sin(-activeSticker.angle);
+        const unY = dx * Math.sin(-activeSticker.angle) + dy * Math.cos(-activeSticker.angle);
+        
+        const halfBox = (activeSticker.size * 10) / 2;
+        
+        // 1. Check if they grabbed the rotation/scale handle (bottom right)
+        // Gave it a 30px forgiving radius for mobile thumbs
+        const distToHandle = Math.sqrt(Math.pow(unX - halfBox, 2) + Math.pow(unY - halfBox, 2));
+        if (distToHandle < 30) {
+            interactionMode = 'scaling';
+            return; 
+        }
+        
+        // 2. Check if they grabbed inside the bounding box to move it
+        if (unX > -halfBox && unX < halfBox && unY > -halfBox && unY < halfBox) {
+            interactionMode = 'moving';
+            return;
+        }
+        
+        // 3. If they clicked outside the box entirely, lock it in!
+        finalizeSticker();
+        return; 
+    }
+
+    // Spawn a new editable sticker if one isn't currently active
     if (isStamping) {
-        // Start holding a sticker instead of stamping it instantly
-        draggingSticker = {
+        activeSticker = {
             x: coords.x,
             y: coords.y,
             text: currentEmojiText,
-            size: current.size // Defaults to slider size if you just tap
+            size: current.size,
+            angle: 0
         };
+        interactionMode = 'none';
     } else {
         drawing = true;
         current.x = coords.x;
@@ -148,10 +195,9 @@ const onPointerDown = (e) => {
 };
 
 const onPointerUp = (e) => {
-    if (isStamping && draggingSticker) {
-        // Let go to finalize the stamp size and broadcast it
-        recordStamp(draggingSticker.x, draggingSticker.y, draggingSticker.text, draggingSticker.size, true);
-        draggingSticker = null; // Clear the temporary preview
+    if (interactionMode !== 'none') {
+        // Let go of the sticker handle, but keep it active
+        interactionMode = 'none';
     } else if (drawing) {
         drawing = false;
         const coords = getCenterCoords(e);
@@ -164,16 +210,20 @@ const onPointerUp = (e) => {
 const onPointerMove = (e) => {
     const coords = getCenterCoords(e);
     
-    if (isStamping && draggingSticker) {
-        // Calculate how far you pulled your mouse/finger from the center
-        const dx = coords.x - draggingSticker.x;
-        const dy = coords.y - draggingSticker.y;
-        const distance = Math.sqrt(dx * dx + dy * dy);
+    if (activeSticker && interactionMode === 'moving') {
+        // Dragging the center of the sticker
+        activeSticker.x = coords.x;
+        activeSticker.y = coords.y;
+    } else if (activeSticker && interactionMode === 'scaling') {
+        // Dragging the handle: Calculate new distance (size) and angle (rotation)
+        const dx = coords.x - activeSticker.x;
+        const dy = coords.y - activeSticker.y;
         
-        // Blow up the sticker size based on pull distance
-        if (distance > 10) {
-            draggingSticker.size = distance / 5;
-        }
+        // Offset by 45 degrees (PI/4) because the handle sits in the bottom right corner
+        activeSticker.angle = Math.atan2(dy, dx) - (Math.PI / 4);
+        
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        activeSticker.size = Math.max(2, distance / 7.07); // 7.07 accounts for corner geometry
     } else if (drawing) {
         const activeColor = isErasing ? '#2a3631' : current.color;
         const activeEffect = isErasing ? 'none' : current.effect;
@@ -188,10 +238,11 @@ canvas.addEventListener('mouseup', onPointerUp);
 canvas.addEventListener('mouseout', onPointerUp);
 canvas.addEventListener('mousemove', onPointerMove);
 
-canvas.addEventListener('touchstart', onPointerDown, { passive: false });
-canvas.addEventListener('touchend', onPointerUp, { passive: false });
-canvas.addEventListener('touchcancel', onPointerUp, { passive: false });
-canvas.addEventListener('touchmove', onPointerMove, { passive: false });
+// Prevents mobile scrolling while interacting with the canvas
+canvas.addEventListener('touchstart', (e) => { e.preventDefault(); onPointerDown(e); }, { passive: false });
+canvas.addEventListener('touchend', (e) => { e.preventDefault(); onPointerUp(e); }, { passive: false });
+canvas.addEventListener('touchcancel', (e) => { e.preventDefault(); onPointerUp(e); }, { passive: false });
+canvas.addEventListener('touchmove', (e) => { e.preventDefault(); onPointerMove(e); }, { passive: false });
 
 socket.on('init', (history) => {
     localHistory = history;
@@ -226,16 +277,21 @@ function renderCanvas() {
     const cx = window.innerWidth / 2;
     const cy = window.innerHeight / 2;
 
+    // Draw all locked-in history
     localHistory.forEach(data => {
         if (data.type === 'emoji') {
+            ctx.save();
+            ctx.translate(data.x + cx, data.y + cy);
+            ctx.rotate(data.angle || 0); // Applies rotation, defaults to 0 for older stickers
+            
             ctx.font = `${data.size * 10}px Arial`; 
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             ctx.shadowBlur = 10;
             ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
-            ctx.fillText(data.text, data.x + cx, data.y + cy);
-            ctx.shadowBlur = 0;
-            ctx.shadowColor = 'transparent';
+            ctx.fillText(data.text, 0, 0);
+            
+            ctx.restore();
         } else {
             const effect = data.effect || 'none';
             ctx.beginPath();
@@ -273,18 +329,40 @@ function renderCanvas() {
         }
     });
 
-    // Draw the temporary preview sticker if you are currently dragging one
-    if (draggingSticker) {
-        ctx.font = `${draggingSticker.size * 10}px Arial`; 
+    // Draw the active editable sticker and its UI bounding box
+    if (activeSticker) {
+        ctx.save();
+        ctx.translate(activeSticker.x + cx, activeSticker.y + cy);
+        ctx.rotate(activeSticker.angle);
+        
+        const boxSize = activeSticker.size * 10;
+        const halfBox = boxSize / 2;
+
+        // 1. Draw Emoji
+        ctx.font = `${boxSize}px Arial`; 
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.shadowBlur = 10;
-        ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
-        // Adds a slight transparency to the preview while dragging
-        ctx.fillStyle = "rgba(255, 255, 255, 0.8)"; 
-        ctx.fillText(draggingSticker.text, draggingSticker.x + cx, draggingSticker.y + cy);
-        ctx.shadowBlur = 0;
-        ctx.shadowColor = 'transparent';
+        ctx.fillText(activeSticker.text, 0, 0);
+
+        // 2. Draw Cyan Dashed Bounding Box
+        ctx.strokeStyle = '#00ffff';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([5, 5]);
+        ctx.strokeRect(-halfBox, -halfBox, boxSize, boxSize);
+
+        // 3. Draw Scale/Rotate Node Handle
+        ctx.setLineDash([]);
+        ctx.fillStyle = '#00ffff';
+        ctx.beginPath();
+        ctx.arc(halfBox, halfBox, 15, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Node Icon
+        ctx.fillStyle = '#000';
+        ctx.font = '16px Arial';
+        ctx.fillText('⤡', halfBox, halfBox);
+
+        ctx.restore();
     }
 
     requestAnimationFrame(renderCanvas);
