@@ -11,9 +11,8 @@ let isErasing = false;
 let isStamping = false; 
 let currentEmojiText = '😀'; 
 
-// New trackers for the active bounding box
 let activeSticker = null; 
-let interactionMode = 'none'; // 'moving', 'scaling', or 'none'
+let interactionMode = 'none'; 
 
 let current = {
     color: '#ffffff',
@@ -27,6 +26,7 @@ ctx.lineJoin = 'round';
 ctx.lineCap = 'round';
 
 const colorPicker = document.getElementById('color-picker');
+const bgColorPicker = document.getElementById('bg-color-picker'); // The new UI element
 const brushSize = document.getElementById('brush-size');
 const eraserBtn = document.getElementById('eraser-btn');
 const effectPicker = document.getElementById('brush-effect');
@@ -35,7 +35,6 @@ const emojiBtn = document.getElementById('emoji-btn');
 const emojiLibrary = document.getElementById('emoji-library');
 const emojis = emojiLibrary.querySelectorAll('span');
 
-// Locks in the sticker if you change tools
 function finalizeSticker() {
     if (activeSticker) {
         recordStamp(activeSticker.x, activeSticker.y, activeSticker.text, activeSticker.size, activeSticker.angle, true);
@@ -43,6 +42,18 @@ function finalizeSticker() {
         interactionMode = 'none';
     }
 }
+
+// Background Color Logic
+bgColorPicker.addEventListener('input', (e) => {
+    finalizeSticker();
+    const newBgColor = e.target.value;
+    document.body.style.backgroundColor = newBgColor; // Update locally instantly
+    
+    // Package it and blast it to the server
+    const bgData = { type: 'bg', color: newBgColor };
+    localHistory.push(bgData);
+    socket.emit('draw', bgData);
+});
 
 colorPicker.addEventListener('input', (e) => {
     finalizeSticker();
@@ -150,7 +161,6 @@ const onPointerDown = (e) => {
     const coords = getCenterCoords(e);
     
     if (activeSticker) {
-        // Un-rotate the click coordinates to accurately check the bounding box hitboxes
         const dx = coords.x - activeSticker.x;
         const dy = coords.y - activeSticker.y;
         const unX = dx * Math.cos(-activeSticker.angle) - dy * Math.sin(-activeSticker.angle);
@@ -158,26 +168,21 @@ const onPointerDown = (e) => {
         
         const halfBox = (activeSticker.size * 10) / 2;
         
-        // 1. Check if they grabbed the rotation/scale handle (bottom right)
-        // Gave it a 30px forgiving radius for mobile thumbs
         const distToHandle = Math.sqrt(Math.pow(unX - halfBox, 2) + Math.pow(unY - halfBox, 2));
         if (distToHandle < 30) {
             interactionMode = 'scaling';
             return; 
         }
         
-        // 2. Check if they grabbed inside the bounding box to move it
         if (unX > -halfBox && unX < halfBox && unY > -halfBox && unY < halfBox) {
             interactionMode = 'moving';
             return;
         }
         
-        // 3. If they clicked outside the box entirely, lock it in!
         finalizeSticker();
         return; 
     }
 
-    // Spawn a new editable sticker if one isn't currently active
     if (isStamping) {
         activeSticker = {
             x: coords.x,
@@ -196,12 +201,11 @@ const onPointerDown = (e) => {
 
 const onPointerUp = (e) => {
     if (interactionMode !== 'none') {
-        // Let go of the sticker handle, but keep it active
         interactionMode = 'none';
     } else if (drawing) {
         drawing = false;
         const coords = getCenterCoords(e);
-        const activeColor = isErasing ? '#2a3631' : current.color;
+        const activeColor = isErasing ? document.body.style.backgroundColor || '#2a3631' : current.color;
         const activeEffect = isErasing ? 'none' : current.effect;
         recordLine(current.x, current.y, coords.x, coords.y, activeColor, current.size, activeEffect, true);
     }
@@ -211,21 +215,18 @@ const onPointerMove = (e) => {
     const coords = getCenterCoords(e);
     
     if (activeSticker && interactionMode === 'moving') {
-        // Dragging the center of the sticker
         activeSticker.x = coords.x;
         activeSticker.y = coords.y;
     } else if (activeSticker && interactionMode === 'scaling') {
-        // Dragging the handle: Calculate new distance (size) and angle (rotation)
         const dx = coords.x - activeSticker.x;
         const dy = coords.y - activeSticker.y;
         
-        // Offset by 45 degrees (PI/4) because the handle sits in the bottom right corner
         activeSticker.angle = Math.atan2(dy, dx) - (Math.PI / 4);
-        
         const distance = Math.sqrt(dx * dx + dy * dy);
-        activeSticker.size = Math.max(2, distance / 7.07); // 7.07 accounts for corner geometry
+        activeSticker.size = Math.max(2, distance / 7.07); 
     } else if (drawing) {
-        const activeColor = isErasing ? '#2a3631' : current.color;
+        // Eraser dynamically checks the current background color instead of hardcoded slate green!
+        const activeColor = isErasing ? document.body.style.backgroundColor || '#2a3631' : current.color;
         const activeEffect = isErasing ? 'none' : current.effect;
         recordLine(current.x, current.y, coords.x, coords.y, activeColor, current.size, activeEffect, true);
         current.x = coords.x;
@@ -238,7 +239,6 @@ canvas.addEventListener('mouseup', onPointerUp);
 canvas.addEventListener('mouseout', onPointerUp);
 canvas.addEventListener('mousemove', onPointerMove);
 
-// Prevents mobile scrolling while interacting with the canvas
 canvas.addEventListener('touchstart', (e) => { e.preventDefault(); onPointerDown(e); }, { passive: false });
 canvas.addEventListener('touchend', (e) => { e.preventDefault(); onPointerUp(e); }, { passive: false });
 canvas.addEventListener('touchcancel', (e) => { e.preventDefault(); onPointerUp(e); }, { passive: false });
@@ -246,14 +246,29 @@ canvas.addEventListener('touchmove', (e) => { e.preventDefault(); onPointerMove(
 
 socket.on('init', (history) => {
     localHistory = history;
+    
+    // Scans history for the latest background color when joining late
+    const latestBg = localHistory.slice().reverse().find(d => d.type === 'bg');
+    if (latestBg) {
+        document.body.style.backgroundColor = latestBg.color;
+        bgColorPicker.value = latestBg.color;
+    }
 });
 
 socket.on('draw', (data) => {
     localHistory.push(data);
+    
+    // Updates UI instantly for everyone else connected when a bg change drops
+    if (data.type === 'bg') {
+        document.body.style.backgroundColor = data.color;
+        bgColorPicker.value = data.color;
+    }
 });
 
 socket.on('clear', () => {
     localHistory = []; 
+    document.body.style.backgroundColor = '#2a3631';
+    bgColorPicker.value = '#2a3631';
 });
 
 const userCountDisplay = document.getElementById('user-count');
@@ -277,12 +292,15 @@ function renderCanvas() {
     const cx = window.innerWidth / 2;
     const cy = window.innerHeight / 2;
 
-    // Draw all locked-in history
     localHistory.forEach(data => {
+        if (data.type === 'bg') {
+            return; // We safely ignore BG packets in the render loop so it doesn't crash trying to draw a line
+        }
+        
         if (data.type === 'emoji') {
             ctx.save();
             ctx.translate(data.x + cx, data.y + cy);
-            ctx.rotate(data.angle || 0); // Applies rotation, defaults to 0 for older stickers
+            ctx.rotate(data.angle || 0); 
             
             ctx.font = `${data.size * 10}px Arial`; 
             ctx.textAlign = 'center';
@@ -302,7 +320,7 @@ function renderCanvas() {
             ctx.shadowColor = 'transparent';
             ctx.strokeStyle = data.color;
 
-            if (effect !== 'none' && data.color !== '#2a3631') {
+            if (effect !== 'none' && data.color !== document.body.style.backgroundColor && data.color !== '#2a3631') {
                 const pos = data.x0 + data.y0;
                 if (effect === 'rainbow') {
                     const hue = (Math.abs(pos / 2) - (time * 5)) % 360; 
@@ -329,7 +347,6 @@ function renderCanvas() {
         }
     });
 
-    // Draw the active editable sticker and its UI bounding box
     if (activeSticker) {
         ctx.save();
         ctx.translate(activeSticker.x + cx, activeSticker.y + cy);
@@ -338,26 +355,22 @@ function renderCanvas() {
         const boxSize = activeSticker.size * 10;
         const halfBox = boxSize / 2;
 
-        // 1. Draw Emoji
         ctx.font = `${boxSize}px Arial`; 
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillText(activeSticker.text, 0, 0);
 
-        // 2. Draw Cyan Dashed Bounding Box
         ctx.strokeStyle = '#00ffff';
         ctx.lineWidth = 2;
         ctx.setLineDash([5, 5]);
         ctx.strokeRect(-halfBox, -halfBox, boxSize, boxSize);
 
-        // 3. Draw Scale/Rotate Node Handle
         ctx.setLineDash([]);
         ctx.fillStyle = '#00ffff';
         ctx.beginPath();
         ctx.arc(halfBox, halfBox, 15, 0, Math.PI * 2);
         ctx.fill();
 
-        // Node Icon
         ctx.fillStyle = '#000';
         ctx.font = '16px Arial';
         ctx.fillText('⤡', halfBox, halfBox);
