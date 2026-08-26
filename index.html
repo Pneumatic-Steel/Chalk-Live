@@ -9,7 +9,7 @@
 <body>
     <div id="toolbar">
         <input type="color" id="color-picker" value="#ffffff" title="Choose Color">
-        <input type="range" id="brush-size" min="1" max="50" value="4" title="Brush Size">
+        <input type="range" id="brush-size" min="1" max="50" value="4" title="Brush Size/Sticker Size">
         
         <select id="brush-effect" title="Brush Effect">
             <option value="none">Solid Color</option>
@@ -19,9 +19,11 @@
             <option value="galaxy">🌌 Galaxy</option>
         </select>
         
-        <div class="tool-btn" id="eraser-btn" title="Eraser">🧹</div>
+        <!-- The Emoji Sticker Tool -->
+        <div class="tool-btn" id="emoji-btn" title="Emoji Stamp Mode">😀</div>
+        <input type="text" id="emoji-input" placeholder="🐶" maxlength="5" title="Type an emoji here!">
         
-        <!-- The new Clear All button -->
+        <div class="tool-btn" id="eraser-btn" title="Eraser">🧹</div>
         <div class="tool-btn" id="clear-btn" title="Clear Board">🗑️</div>
     </div>
 
