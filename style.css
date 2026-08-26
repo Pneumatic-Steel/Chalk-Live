@@ -16,8 +16,8 @@ body, html {
     top: 10px;
     left: 10px;
     display: flex;
-    flex-wrap: wrap; /* Allows tools to drop to a second line if they run out of room */
-    max-width: calc(100% - 100px); /* Leaves a safe space for the counter on PC */
+    flex-wrap: wrap; 
+    max-width: calc(100% - 100px); 
     align-items: center;
     gap: 15px;
     background: rgba(0, 0, 0, 0.4);
@@ -26,7 +26,6 @@ body, html {
     z-index: 10;
 }
 
-/* Customizing the native color picker wheel */
 #color-picker {
     -webkit-appearance: none;
     -moz-appearance: none;
@@ -41,27 +40,15 @@ body, html {
     transition: transform 0.1s;
 }
 
-#color-picker:hover {
-    transform: scale(1.1);
-}
+#color-picker:hover { transform: scale(1.1); }
+#color-picker::-webkit-color-swatch { border-radius: 50%; border: 2px solid white; }
+#color-picker::-moz-color-swatch { border-radius: 50%; border: 2px solid white; }
 
-#color-picker::-webkit-color-swatch {
-    border-radius: 50%;
-    border: 2px solid white;
-}
-
-#color-picker::-moz-color-swatch {
-    border-radius: 50%;
-    border: 2px solid white;
-}
-
-/* Styling the size slider */
 #brush-size {
     cursor: pointer;
     width: 100px;
 }
 
-/* Styling for the tool buttons */
 .tool-btn {
     width: 35px;
     height: 35px;
@@ -77,16 +64,27 @@ body, html {
     user-select: none;
 }
 
-.tool-btn:hover {
-    transform: scale(1.1);
+.tool-btn:hover { transform: scale(1.1); }
+.tool-btn.active { border-color: white; background: #666; }
+
+/* The new Emoji Input styling */
+#emoji-input {
+    width: 40px;
+    height: 35px;
+    border-radius: 8px;
+    border: 2px solid transparent;
+    background: #444;
+    color: white;
+    text-align: center;
+    font-size: 20px;
+    outline: none;
+    transition: 0.1s;
 }
 
-.tool-btn.active {
+#emoji-input:focus {
     border-color: white;
-    background: #666;
 }
 
-/* Styling for the player counter */
 #counter {
     position: absolute;
     top: 10px;
@@ -105,7 +103,6 @@ body, html {
     user-select: none;
 }
 
-/* Styling for the new effect dropdown */
 #brush-effect {
     background: #444;
     color: white;
@@ -119,25 +116,10 @@ body, html {
     transition: transform 0.1s;
 }
 
-#brush-effect:hover {
-    border-color: white;
-    transform: scale(1.05);
-}
+#brush-effect:hover { border-color: white; transform: scale(1.05); }
 
-/* --- MOBILE SPECIFIC RULES --- */
 @media (max-width: 700px) {
-    #counter {
-        top: auto;
-        bottom: 20px; /* Drops the counter to the bottom right on phones */
-        right: 15px;
-    }
-    
-    #toolbar {
-        max-width: calc(100% - 40px); /* Gives the toolbar the full top of the screen */
-        gap: 10px; /* Shrinks the space between tools slightly */
-    }
-    
-    #brush-size {
-        width: 70px; /* Makes the slider slightly shorter to fit better */
-    }
+    #counter { top: auto; bottom: 20px; right: 15px; }
+    #toolbar { max-width: calc(100% - 40px); gap: 10px; }
+    #brush-size { width: 70px; }
 }
