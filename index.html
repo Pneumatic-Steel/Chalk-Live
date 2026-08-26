@@ -8,7 +8,12 @@
 </head>
 <body>
     <div id="toolbar">
-        <input type="color" id="color-picker" value="#ffffff" title="Choose Color">
+        <!-- Chalk Color -->
+        <input type="color" id="color-picker" value="#ffffff" title="Chalk Color">
+        
+        <!-- NEW: Background Color -->
+        <input type="color" id="bg-color-picker" value="#2a3631" title="Background Color">
+        
         <input type="range" id="brush-size" min="1" max="50" value="4" title="Brush Size / Sticker Size">
         
         <select id="brush-effect" title="Brush Effect">
@@ -19,13 +24,10 @@
             <option value="galaxy">🌌 Galaxy</option>
         </select>
         
-        <!-- The new Emoji Library Toggle -->
         <div class="tool-btn" id="emoji-btn" title="Emoji Sticker Library">😀</div>
-        
         <div class="tool-btn" id="eraser-btn" title="Eraser">🧹</div>
         <div class="tool-btn" id="clear-btn" title="Clear Board">🗑️</div>
         
-        <!-- The Pop-Out Emoji Menu -->
         <div id="emoji-library">
             <span>😀</span><span>😂</span><span>😎</span><span>😍</span><span>😡</span><span>🤡</span>
             <span>🐶</span><span>🐱</span><span>🐭</span><span>🦊</span><span>🐻</span><span>🐸</span>
