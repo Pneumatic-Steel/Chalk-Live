@@ -8,7 +8,8 @@ canvas.height = window.innerHeight;
 let drawing = false;
 let localHistory = [];
 let isErasing = false;
-let isStamping = false; // New Emoji Mode tracker
+let isStamping = false; 
+let currentEmojiText = '😀'; // Default equip
 let current = {
     color: '#ffffff',
     size: 4,
@@ -26,13 +27,16 @@ const eraserBtn = document.getElementById('eraser-btn');
 const effectPicker = document.getElementById('brush-effect');
 const clearBtn = document.getElementById('clear-btn');
 const emojiBtn = document.getElementById('emoji-btn');
-const emojiInput = document.getElementById('emoji-input');
+const emojiLibrary = document.getElementById('emoji-library');
+const emojis = emojiLibrary.querySelectorAll('span');
 
+// Color picker logic resets stamping
 colorPicker.addEventListener('input', (e) => {
     isErasing = false;
     isStamping = false;
     eraserBtn.classList.remove('active');
     emojiBtn.classList.remove('active');
+    emojiLibrary.classList.remove('show'); // Hide menu
     current.color = e.target.value;
     current.effect = 'none';
     effectPicker.value = 'none';
@@ -47,6 +51,7 @@ effectPicker.addEventListener('change', (e) => {
     isStamping = false;
     eraserBtn.classList.remove('active');
     emojiBtn.classList.remove('active');
+    emojiLibrary.classList.remove('show');
     current.effect = e.target.value;
 });
 
@@ -55,22 +60,32 @@ eraserBtn.addEventListener('click', () => {
     isStamping = false;
     eraserBtn.classList.add('active');
     emojiBtn.classList.remove('active');
+    emojiLibrary.classList.remove('show');
 });
 
-// Activate Emoji Mode
+// Toggles the new Emoji Library Menu
 emojiBtn.addEventListener('click', () => {
-    isStamping = true;
-    isErasing = false;
-    emojiBtn.classList.add('active');
-    eraserBtn.classList.remove('active');
+    emojiLibrary.classList.toggle('show');
+    if (emojiLibrary.classList.contains('show')) {
+        isStamping = true;
+        isErasing = false;
+        emojiBtn.classList.add('active');
+        eraserBtn.classList.remove('active');
+    }
 });
 
-// Auto-activate Emoji Mode if you click into the text box
-emojiInput.addEventListener('focus', () => {
-    isStamping = true;
-    isErasing = false;
-    emojiBtn.classList.add('active');
-    eraserBtn.classList.remove('active');
+// Logic for clicking an emoji inside the menu
+emojis.forEach(emojiSpan => {
+    emojiSpan.addEventListener('click', (e) => {
+        // Remove highlight from all, add to the one clicked
+        emojis.forEach(span => span.classList.remove('selected'));
+        e.target.classList.add('selected');
+        
+        // Equip the clicked emoji
+        currentEmojiText = e.target.innerText;
+        emojiBtn.innerText = currentEmojiText; // Updates the main button icon
+        emojiLibrary.classList.remove('show'); // Auto-close menu after picking
+    });
 });
 
 clearBtn.addEventListener('click', () => {
@@ -106,7 +121,6 @@ const recordLine = (x0, y0, x1, y1, color, size, effect, emit) => {
     }
 };
 
-// Packages and sends emoji sticker data
 const recordStamp = (x, y, text, size, emit) => {
     const stampData = { type: 'emoji', x, y, text, size };
     if (emit) {
@@ -116,15 +130,16 @@ const recordStamp = (x, y, text, size, emit) => {
 };
 
 const onPointerDown = (e) => {
-    // If they click on the toolbar itself, don't draw or stamp
     if (e.target.closest('#toolbar')) return; 
+
+    // Auto-close the emoji menu if they click the canvas
+    emojiLibrary.classList.remove('show');
 
     const coords = getCenterCoords(e);
     
     if (isStamping) {
-        // Drop the sticker immediately on click!
-        const emoji = emojiInput.value || '😀';
-        recordStamp(coords.x, coords.y, emoji, current.size, true);
+        // Plop down the currently equipped emoji from the library
+        recordStamp(coords.x, coords.y, currentEmojiText, current.size, true);
     } else {
         drawing = true;
         current.x = coords.x;
@@ -195,24 +210,19 @@ function renderCanvas() {
     const cy = window.innerHeight / 2;
 
     localHistory.forEach(data => {
-        // If the data packet is an emoji sticker
         if (data.type === 'emoji') {
-            ctx.font = `${data.size * 10}px Arial`; // Multiplies the slider size to make it huge
+            ctx.font = `${data.size * 10}px Arial`; 
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             
-            // Emoji shadow for some depth
             ctx.shadowBlur = 10;
             ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
             
             ctx.fillText(data.text, data.x + cx, data.y + cy);
             
-            // Reset shadow so it doesn't bleed into lines
             ctx.shadowBlur = 0;
             ctx.shadowColor = 'transparent';
-        } 
-        // If the data packet is a chalk line or old data from before the update
-        else {
+        } else {
             const effect = data.effect || 'none';
             
             ctx.beginPath();
