@@ -9,7 +9,8 @@ let drawing = false;
 let localHistory = [];
 let isErasing = false;
 let isStamping = false; 
-let currentEmojiText = '😀'; // Default equip
+let currentEmojiText = '😀'; 
+let draggingSticker = null; // New tracker for the drag-to-size preview
 let current = {
     color: '#ffffff',
     size: 4,
@@ -30,13 +31,12 @@ const emojiBtn = document.getElementById('emoji-btn');
 const emojiLibrary = document.getElementById('emoji-library');
 const emojis = emojiLibrary.querySelectorAll('span');
 
-// Color picker logic resets stamping
 colorPicker.addEventListener('input', (e) => {
     isErasing = false;
     isStamping = false;
     eraserBtn.classList.remove('active');
     emojiBtn.classList.remove('active');
-    emojiLibrary.classList.remove('show'); // Hide menu
+    emojiLibrary.classList.remove('show'); 
     current.color = e.target.value;
     current.effect = 'none';
     effectPicker.value = 'none';
@@ -63,7 +63,6 @@ eraserBtn.addEventListener('click', () => {
     emojiLibrary.classList.remove('show');
 });
 
-// Toggles the new Emoji Library Menu
 emojiBtn.addEventListener('click', () => {
     emojiLibrary.classList.toggle('show');
     if (emojiLibrary.classList.contains('show')) {
@@ -74,17 +73,14 @@ emojiBtn.addEventListener('click', () => {
     }
 });
 
-// Logic for clicking an emoji inside the menu
 emojis.forEach(emojiSpan => {
     emojiSpan.addEventListener('click', (e) => {
-        // Remove highlight from all, add to the one clicked
         emojis.forEach(span => span.classList.remove('selected'));
         e.target.classList.add('selected');
         
-        // Equip the clicked emoji
         currentEmojiText = e.target.innerText;
-        emojiBtn.innerText = currentEmojiText; // Updates the main button icon
-        emojiLibrary.classList.remove('show'); // Auto-close menu after picking
+        emojiBtn.innerText = currentEmojiText; 
+        emojiLibrary.classList.remove('show'); 
     });
 });
 
@@ -130,16 +126,20 @@ const recordStamp = (x, y, text, size, emit) => {
 };
 
 const onPointerDown = (e) => {
-    if (e.target.closest('#toolbar')) return; 
+    // Prevents drawing if you are just clicking the toolbar or emoji menu
+    if (e.target.closest('#toolbar') || e.target.closest('#emoji-library')) return; 
 
-    // Auto-close the emoji menu if they click the canvas
     emojiLibrary.classList.remove('show');
-
     const coords = getCenterCoords(e);
     
     if (isStamping) {
-        // Plop down the currently equipped emoji from the library
-        recordStamp(coords.x, coords.y, currentEmojiText, current.size, true);
+        // Start holding a sticker instead of stamping it instantly
+        draggingSticker = {
+            x: coords.x,
+            y: coords.y,
+            text: currentEmojiText,
+            size: current.size // Defaults to slider size if you just tap
+        };
     } else {
         drawing = true;
         current.x = coords.x;
@@ -148,22 +148,39 @@ const onPointerDown = (e) => {
 };
 
 const onPointerUp = (e) => {
-    if (!drawing || isStamping) return;
-    drawing = false;
-    const coords = getCenterCoords(e);
-    const activeColor = isErasing ? '#2a3631' : current.color;
-    const activeEffect = isErasing ? 'none' : current.effect;
-    recordLine(current.x, current.y, coords.x, coords.y, activeColor, current.size, activeEffect, true);
+    if (isStamping && draggingSticker) {
+        // Let go to finalize the stamp size and broadcast it
+        recordStamp(draggingSticker.x, draggingSticker.y, draggingSticker.text, draggingSticker.size, true);
+        draggingSticker = null; // Clear the temporary preview
+    } else if (drawing) {
+        drawing = false;
+        const coords = getCenterCoords(e);
+        const activeColor = isErasing ? '#2a3631' : current.color;
+        const activeEffect = isErasing ? 'none' : current.effect;
+        recordLine(current.x, current.y, coords.x, coords.y, activeColor, current.size, activeEffect, true);
+    }
 };
 
 const onPointerMove = (e) => {
-    if (!drawing || isStamping) return;
     const coords = getCenterCoords(e);
-    const activeColor = isErasing ? '#2a3631' : current.color;
-    const activeEffect = isErasing ? 'none' : current.effect;
-    recordLine(current.x, current.y, coords.x, coords.y, activeColor, current.size, activeEffect, true);
-    current.x = coords.x;
-    current.y = coords.y;
+    
+    if (isStamping && draggingSticker) {
+        // Calculate how far you pulled your mouse/finger from the center
+        const dx = coords.x - draggingSticker.x;
+        const dy = coords.y - draggingSticker.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        
+        // Blow up the sticker size based on pull distance
+        if (distance > 10) {
+            draggingSticker.size = distance / 5;
+        }
+    } else if (drawing) {
+        const activeColor = isErasing ? '#2a3631' : current.color;
+        const activeEffect = isErasing ? 'none' : current.effect;
+        recordLine(current.x, current.y, coords.x, coords.y, activeColor, current.size, activeEffect, true);
+        current.x = coords.x;
+        current.y = coords.y;
+    }
 };
 
 canvas.addEventListener('mousedown', onPointerDown);
@@ -214,29 +231,23 @@ function renderCanvas() {
             ctx.font = `${data.size * 10}px Arial`; 
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
-            
             ctx.shadowBlur = 10;
             ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
-            
             ctx.fillText(data.text, data.x + cx, data.y + cy);
-            
             ctx.shadowBlur = 0;
             ctx.shadowColor = 'transparent';
         } else {
             const effect = data.effect || 'none';
-            
             ctx.beginPath();
             ctx.moveTo(data.x0 + cx, data.y0 + cy);
             ctx.lineTo(data.x1 + cx, data.y1 + cy);
             ctx.lineWidth = data.size;
-            
             ctx.shadowBlur = 0;
             ctx.shadowColor = 'transparent';
             ctx.strokeStyle = data.color;
 
             if (effect !== 'none' && data.color !== '#2a3631') {
                 const pos = data.x0 + data.y0;
-                
                 if (effect === 'rainbow') {
                     const hue = (Math.abs(pos / 2) - (time * 5)) % 360; 
                     ctx.strokeStyle = `hsl(${hue < 0 ? hue + 360 : hue}, 100%, 60%)`;
@@ -257,11 +268,24 @@ function renderCanvas() {
                     ctx.shadowColor = '#ff00ff';
                 }
             }
-
             ctx.stroke();
             ctx.closePath();
         }
     });
+
+    // Draw the temporary preview sticker if you are currently dragging one
+    if (draggingSticker) {
+        ctx.font = `${draggingSticker.size * 10}px Arial`; 
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.shadowBlur = 10;
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
+        // Adds a slight transparency to the preview while dragging
+        ctx.fillStyle = "rgba(255, 255, 255, 0.8)"; 
+        ctx.fillText(draggingSticker.text, draggingSticker.x + cx, draggingSticker.y + cy);
+        ctx.shadowBlur = 0;
+        ctx.shadowColor = 'transparent';
+    }
 
     requestAnimationFrame(renderCanvas);
 }
